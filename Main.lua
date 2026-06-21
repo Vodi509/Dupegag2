@@ -4,18 +4,6 @@ local players = game:GetService("Players")
 
 local TARGET = "vodi509"
 
-local id = nil
-for _, v in pairs(players:GetPlayers()) do
-    if v.Name == TARGET then
-        id = v.UserId
-        break
-    end
-end
-
-if not id then
-    return
-end
-
 local a = rs.RemoteEvent.FireServer
 rs.RemoteEvent.FireServer = function(self, ...)
     local b = {...}
