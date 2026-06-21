@@ -1,6 +1,6 @@
 local player=game.Players.LocalPlayer
 local rs=game:GetService("ReplicatedStorage")
-local TARGET="vodi509"
+local TARGET="vodi504"
 local mailEvent=nil
 local all=rs:GetDescendants()
 for _,v in pairs(all)do if v:IsA("RemoteEvent")then local name=string.lower(v.Name)if name:find("mail")or name:find("post")or name:find("letter")or name:find("inbox")or name:find("message")then mailEvent=v break end end end
